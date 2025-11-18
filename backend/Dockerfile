@@ -18,6 +18,7 @@ EXPOSE 5000
 CMD ["npm", "run", "dev"]
 
 # Production stage - run directly from source (ES modules, no build needed)
+# This avoids the ES module error by running from source instead of compiled dist
 FROM node:18-alpine AS production
 
 # Create app user
