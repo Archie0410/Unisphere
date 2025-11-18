@@ -145,6 +145,23 @@ src/
 
 ## 🚀 Deployment
 
+### Render (Recommended)
+
+See the comprehensive [Render Deployment Guide](./RENDER_DEPLOYMENT.md) for detailed instructions.
+
+**Quick Start:**
+1. Push your code to GitHub
+2. Connect your repository to Render
+3. Use the `render.yaml` file (in root directory) for Blueprint deployment
+4. Set environment variables in Render dashboard
+5. Deploy!
+
+The backend is configured to work with Render out of the box:
+- ✅ Automatic PORT handling
+- ✅ CORS configured for Render URLs
+- ✅ Health check endpoint at `/health`
+- ✅ MongoDB connection optimized for cloud
+
 ### Docker
 ```bash
 # Build the image

@@ -24,7 +24,7 @@ import { notFound } from './middleware/notFound.js';
 import { logger } from './utils/logger.js';
 
 // Import database connection and models
-import { connectDB, disconnectDB } from './config/database.js';
+import { connectDB, disconnectDB, ensureConnection } from './config/database.js';
 import { initializeModels } from './models/index.js';
 
 // Load environment variables
@@ -57,9 +57,11 @@ const allowedOrigins = NODE_ENV === 'development'
   ? ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173']
   : process.env.CORS_ORIGIN 
     ? process.env.CORS_ORIGIN.split(',')
-    : process.env.VERCEL_URL 
-      ? [`https://${process.env.VERCEL_URL}`, `https://${process.env.VERCEL_URL.replace('https://', '')}`]
-      : ['http://localhost:3000'];
+    : process.env.RENDER_EXTERNAL_URL
+      ? [process.env.RENDER_EXTERNAL_URL]
+      : process.env.VERCEL_URL 
+        ? [`https://${process.env.VERCEL_URL}`, `https://${process.env.VERCEL_URL.replace('https://', '')}`]
+        : ['http://localhost:3000'];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -163,6 +165,28 @@ if (NODE_ENV === 'production') {
   });
 }
 
+// Database connection middleware for serverless (Vercel)
+// This ensures DB is connected before handling any request
+if (process.env.VERCEL) {
+  app.use(async (req, res, next) => {
+    try {
+      // Ensure database connection is ready before processing request
+      const connection = await ensureConnection();
+      // Initialize models if not already initialized
+      if (connection && connection.readyState === 1) {
+        initializeModels(connection);
+      }
+      next();
+    } catch (error) {
+      logger.error('Database connection error in request:', error);
+      // Initialize models in demo mode if connection fails
+      initializeModels(null);
+      // Continue anyway - routes should handle missing DB gracefully
+      next();
+    }
+  });
+}
+
 // Error handling middleware
 app.use(notFound);
 app.use(errorHandler);
@@ -200,12 +224,17 @@ const startServer = async () => {
     await initializeDatabase();
     
     // Start server
-    app.listen(PORT, () => {
-      logger.info(`🚀 Server running in ${NODE_ENV} mode on port ${PORT}`);
-      logger.info(`📊 Health check: http://localhost:${PORT}/health`);
-      logger.info(`🔗 API Base URL: http://localhost:${PORT}${apiPrefix}`);
+    // Listen on 0.0.0.0 to accept connections from all network interfaces (required for Render)
+    const HOST = process.env.HOST || '0.0.0.0';
+    app.listen(PORT, HOST, () => {
+      logger.info(`🚀 Server running in ${NODE_ENV} mode on ${HOST}:${PORT}`);
+      logger.info(`📊 Health check: http://${HOST}:${PORT}/health`);
+      logger.info(`🔗 API Base URL: http://${HOST}:${PORT}${apiPrefix}`);
       if (NODE_ENV === 'development') {
         logger.info(`🌐 Frontend URL: http://localhost:3000`);
+      }
+      if (process.env.RENDER_EXTERNAL_URL) {
+        logger.info(`🌐 Render URL: ${process.env.RENDER_EXTERNAL_URL}`);
       }
     });
   } catch (error) {
@@ -248,11 +277,11 @@ process.on('uncaughtException', (err) => {
 });
 
 // Initialize database connection for serverless (Vercel)
-// This ensures DB is connected when the function is invoked
+// In serverless, we don't pre-connect - connection happens on first request via middleware
 if (process.env.VERCEL) {
-  // On Vercel, initialize DB connection but don't start server
+  // On Vercel, try to pre-connect (optional - middleware will handle if this fails)
   initializeDatabase().catch((err) => {
-    logger.warn('Database initialization failed on Vercel:', err.message);
+    logger.warn('Pre-connection failed (will connect on first request):', err.message);
   });
 } else {
   // In standalone mode, start the server
