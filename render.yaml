@@ -1,4 +1,5 @@
 services:
+  # Backend Service (Node.js API)
   - type: web
     name: dream-uni-finder-backend
     env: node
@@ -27,6 +28,29 @@ services:
       - key: CORS_ORIGIN
         sync: false
         # Add your frontend URL(s) separated by commas
+        # After frontend deploys, update this to: https://dream-uni-finder-frontend.onrender.com
       - key: API_VERSION
         value: v1
+
+  # Frontend Service (Static Site - Vite React App)
+  - type: static
+    name: dream-uni-finder-frontend
+    region: oregon
+    plan: free
+    rootDir: .
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+        # Set this to your backend URL after it deploys
+        # Example: https://dream-uni-finder-backend.onrender.com/api/v1
+        # Update CORS_ORIGIN in backend service to match this frontend URL
 
