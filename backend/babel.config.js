@@ -3,10 +3,12 @@ export default {
     ['@babel/preset-env', {
       targets: {
         node: 'current'
-      }
+      },
+      modules: false // Keep ES modules instead of converting to CommonJS
     }]
   ]
 };
+
 
 
 

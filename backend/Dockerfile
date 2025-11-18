@@ -17,13 +17,7 @@ COPY . .
 EXPOSE 5000
 CMD ["npm", "run", "dev"]
 
-# Build stage
-FROM base AS build
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Production stage
+# Production stage - run directly from source (ES modules, no build needed)
 FROM node:18-alpine AS production
 
 # Create app user
@@ -39,8 +33,8 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
-# Copy built application
-COPY --from=build /app/dist ./dist
+# Copy source files (run directly without build since we're using ES modules)
+COPY src ./src
 
 # Create necessary directories
 RUN mkdir -p logs uploads && chown -R nodejs:nodejs /app
@@ -51,9 +45,9 @@ USER nodejs
 # Expose port
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node healthcheck.js
+# Health check - Render will use the healthCheckPath from render.yaml instead
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#   CMD node -e "import('http').then(m=>m.get('http://localhost:5000/health',r=>process.exit(r.statusCode===200?0:1)))"
 
-# Start application
-CMD ["node", "dist/index.js"]
+# Start application from source (ES modules)
+CMD ["node", "src/index.js"]
